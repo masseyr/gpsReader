@@ -64,7 +64,7 @@ def get_gps():
 	"""
 
 	gpsd = gps(mode=WATCH_ENABLE|WATCH_NEWSTYLE)
-	timeout=30
+
 	while True:
 	    report = gpsd.next()
 	    if report['class'] == 'TPV':
