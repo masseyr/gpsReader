@@ -80,4 +80,4 @@ if __name__ == '__main__':
     try:
         get_gps()
     except Exception as e:
-        sys.stdout.write(e + '\n')
+        sys.stdout.write(e)
