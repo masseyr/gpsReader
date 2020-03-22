@@ -75,6 +75,8 @@ def get_gps(host='127.0.0.1',
                port=port,
                mode=WATCH_ENABLE|WATCH_NEWSTYLE)
 
+    print(gpsd.gps_id)
+
     while True:
         report = gpsd.next()
         if report['class'] == 'TPV':
