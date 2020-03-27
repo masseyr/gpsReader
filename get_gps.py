@@ -5,12 +5,14 @@ import time
 import sys
 import os
 import signal
+import json
 
 """
 Python script to read GPS coordinates and write to stdout
 """
 
-class TimeoutError(Exception):
+
+class TimeOutError(Exception):
     """
     Error class for use in returning fields that may be in error.
     """
@@ -23,7 +25,6 @@ class TimeoutError(Exception):
                  headers=None):
         """
         :param error: name of error
-        :param description: readable description
         :param status_code: the http status code
         :param headers: any applicable headers
         :return:
@@ -39,6 +40,7 @@ class TimeoutError(Exception):
     def __str__(self):
         return self.description
 
+
 def timeout(seconds=10):
     """
     wrapper to end requests that time out
@@ -46,7 +48,7 @@ def timeout(seconds=10):
     def decorator(func):
 
         def handler(signum, frame):
-            raise TimeoutError(seconds=seconds)
+            raise TimeOutError(seconds=seconds)
 
         def wrapper(*args, **kwargs):
             signal.signal(signal.SIGALRM, handler)
@@ -62,6 +64,33 @@ def timeout(seconds=10):
     return decorator
 
 
+def take_note(gps_dict,
+              host='127.0.0.1',
+              port='2947'):
+    """
+    Function to read from stored coords if the gps read fails
+
+    """
+    last_reading_file = '/tmp/gpscoords-{}-{}'.format(host,
+                                                      port)
+
+    if (gps_dict is None) or (gps_dict['lat'] == 'Nofix'):
+        if os.path.isfile(last_reading_file):
+            with open(last_reading_file, 'r') as gpsf:
+                fileline = gpsf.readlines()
+                gps_str = fileline[0].strip()
+
+    else:
+        gps_str = '{} {} {} {}'.format(gps_dict['lat'],
+                                       gps_dict['lon'],
+                                       gps_dict['alt'],
+                                       gps_dict['time'])
+        with open(last_reading_file, 'w') as gpsf:
+            gpsf.write(gps_str)
+
+    sys.stdout.write(gps_str + '\n')
+
+
 @timeout(15)
 def get_gps(host='127.0.0.1', 
             port='2947'):
@@ -69,7 +98,7 @@ def get_gps(host='127.0.0.1',
     Function to get GPS coordinates from a working gpsd reading a GPS device
     format: latitide longitude altitude(m) time(UTC)
     This function will time out in 15 seconds
-    """
+    """    
 
     gpsd = gps(host=host,
                port=port,
@@ -78,11 +107,10 @@ def get_gps(host='127.0.0.1',
     while True:
         report = gpsd.next()
         if report['class'] == 'TPV':
-            sys.stdout.write('{} {} {} {}\n'.format(getattr(report,'lat','Nofix'),
-                                                    getattr(report,'lon','Nofix'),
-                                                    getattr(report,'alt','Nofix'),
-                                                    getattr(report,'time','Nofix')))
-            exit()
+            return {'lat': getattr(report,'lat','Nofix'),
+                    'lon': getattr(report,'lon','Nofix'),
+                    'alt': getattr(report,'alt','Nofix'),
+                    'time': getattr(report,'time','Nofix')}
 
 
 if __name__ == '__main__':
@@ -101,6 +129,7 @@ if __name__ == '__main__':
         script, host, port = sys.argv[0:3]
 
     try:
-        get_gps(host=host, port=port)
+        gps_dict = get_gps(host=host, port=port)
+        take_note(gps_dict, host=host, port=port)
     except Exception as e:
-        sys.stdout.write(e.message)
+        sys.stdout.write(e.args[0])
